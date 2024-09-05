@@ -29,7 +29,7 @@ categoryController.get = async function (req, res, next) {
 
 	let currentPage = parseInt(req.query.page, 10) || 1;
 	let topicIndex = utils.isNumber(req.params.topic_index) ? parseInt(req.params.topic_index, 10) - 1 : 0;
-	if ((req.params.topic_index && !utils.isNumber(req.params.topic_index)) || !utils.isNumber(cid)) {
+	if (isInvalidCatOrInd(req)) {
 		return next();
 	}
 
@@ -41,9 +41,7 @@ categoryController.get = async function (req, res, next) {
 		user.auth.getFeedToken(req.uid),
 	]);
 
-	if (!categoryFields.slug ||
-		(categoryFields && categoryFields.disabled) ||
-		(userSettings.usePagination && currentPage < 1)) {
+	if (Cat(categoryFields, userSettings, currentPage)) {
 		return next();
 	}
 	if (topicIndex < 0) {
@@ -158,6 +156,16 @@ categoryController.get = async function (req, res, next) {
 	res.render('category', categoryData);
 };
 
+function isInvalidCatOrInd(req, cid) {
+	return (req.params.topic_index && !utils.isNumber(req.params.topic_index)) || !utils.isNumber(cid);
+}
+
+function Cat(categoryFields, userSettings, currentPage) {
+	return (!categoryFields.slug ||
+		(categoryFields && categoryFields.disabled) ||
+		(userSettings.usePagination && currentPage < 1));
+}
+
 async function buildBreadcrumbs(req, categoryData) {
 	const breadcrumbs = [
 		{
@@ -227,3 +235,4 @@ function addTags(categoryData, res, currentPage) {
 		});
 	}
 }
+
