@@ -5,11 +5,15 @@ const nconf = require('nconf');
 const validator = require('validator');
 const qs = require('querystring');
 
+
 const db = require('../database');
 const privileges = require('../privileges');
 const user = require('../user');
 const categories = require('../categories');
 const meta = require('../meta');
+
+const isRssEnabled = !meta.config['feeds:disableRSS'];
+
 const pagination = require('../pagination');
 const helpers = require('./helpers');
 const utils = require('../utils');
@@ -29,7 +33,7 @@ categoryController.get = async function (req, res, next) {
 
 	let currentPage = parseInt(req.query.page, 10) || 1;
 	let topicIndex = utils.isNumber(req.params.topic_index) ? parseInt(req.params.topic_index, 10) - 1 : 0;
-	if (isInvalidCatOrInd(req)) {
+	if ((req.params.topic_index && !utils.isNumber(req.params.topic_index)) || !utils.isNumber(cid)) {
 		return next();
 	}
 
@@ -41,7 +45,9 @@ categoryController.get = async function (req, res, next) {
 		user.auth.getFeedToken(req.uid),
 	]);
 
-	if (Cat(categoryFields, userSettings, currentPage)) {
+	if (!categoryFields.slug ||
+		(categoryFields && categoryFields.disabled) ||
+		(userSettings.usePagination && currentPage < 1)) {
 		return next();
 	}
 	if (topicIndex < 0) {
@@ -134,7 +140,7 @@ categoryController.get = async function (req, res, next) {
 	categoryData.selectedTags = tagData.selectedTags;
 	categoryData.sortOptionLabel = `[[topic:${validator.escape(String(sort)).replace(/_/g, '-')}]]`;
 
-	if (!meta.config['feeds:disableRSS']) {
+	if (isRssEnabled) {
 		categoryData.rssFeedUrl = `${url}/category/${categoryData.cid}.rss`;
 		if (req.loggedIn) {
 			categoryData.rssFeedUrl += `?uid=${req.uid}&token=${rssToken}`;
@@ -156,15 +162,6 @@ categoryController.get = async function (req, res, next) {
 	res.render('category', categoryData);
 };
 
-function isInvalidCatOrInd(req, cid) {
-	return (req.params.topic_index && !utils.isNumber(req.params.topic_index)) || !utils.isNumber(cid);
-}
-
-function Cat(categoryFields, userSettings, currentPage) {
-	return (!categoryFields.slug ||
-		(categoryFields && categoryFields.disabled) ||
-		(userSettings.usePagination && currentPage < 1));
-}
 
 async function buildBreadcrumbs(req, categoryData) {
 	const breadcrumbs = [
@@ -235,4 +232,3 @@ function addTags(categoryData, res, currentPage) {
 		});
 	}
 }
-
